@@ -8,14 +8,6 @@
 </head>
 <body>
   <div class="app-shell">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">Mobile-first task flow</p>
-        <h1>Todo Board</h1>
-        <p class="hero-copy">Create tasks, sort them with drag and drop, archive finished work with completion timestamps, and export your completed history.</p>
-      </div>
-    </header>
-
     <main class="layout">
       <section class="panel form-panel">
         <h2>Add Todo</h2>
@@ -25,46 +17,10 @@
             <input id="todoTitle" name="title" type="text" maxlength="120" placeholder="What needs to get done?" required>
           </label>
           <label>
-            Notes
-            <textarea id="todoNotes" name="notes" rows="3" maxlength="240" placeholder="Optional details"></textarea>
-          </label>
-          <label>
             Category
             <select id="todoCategory" name="categoryId"></select>
           </label>
           <button class="primary-button" type="submit">Add Todo</button>
-        </form>
-      </section>
-
-      <section class="panel form-panel">
-        <h2>Create Category</h2>
-        <form id="categoryForm" class="stack-form compact-form">
-          <label>
-            Category name
-            <input id="categoryName" name="name" type="text" maxlength="60" placeholder="Work, Home, Errands" required>
-          </label>
-          <label>
-            Accent color
-            <input id="categoryColor" name="color" type="color" value="#1d8f6a">
-          </label>
-          <button class="secondary-button" type="submit">Add Category</button>
-        </form>
-
-        <h3>Add Category Link</h3>
-        <form id="linkForm" class="stack-form compact-form">
-          <label>
-            Category
-            <select id="linkCategory" name="categoryId"></select>
-          </label>
-          <label>
-            Button label
-            <input id="linkLabel" name="label" type="text" maxlength="40" placeholder="Open docs" required>
-          </label>
-          <label>
-            URL
-            <input id="linkUrl" name="url" type="url" placeholder="https://example.com" required>
-          </label>
-          <button class="secondary-button" type="submit">Add Link Button</button>
         </form>
       </section>
 
