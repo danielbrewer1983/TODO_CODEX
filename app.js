@@ -8,7 +8,6 @@ const defaultCategories = [
     name: "General",
     color: "#1d8f6a",
     links: [
-      { id: createId(), label: "Calendar", url: "https://calendar.google.com" },
       { id: createId(), label: "Notes", url: "https://keep.google.com" }
     ]
   },
@@ -19,20 +18,43 @@ const defaultCategories = [
     links: [
       { id: createId(), label: "Email", url: "https://mail.google.com" }
     ]
+  },
+  {
+    id: createId(),
+    name: "MOOSE",
+    color: "#7c5c3b",
+    links: []
+  },
+  {
+    id: createId(),
+    name: "FAMILY",
+    color: "#c1607a",
+    links: []
+  },
+  {
+    id: createId(),
+    name: "HOME",
+    color: "#4b7f52",
+    links: []
+  },
+  {
+    id: createId(),
+    name: "HEALTH",
+    color: "#3b7ca5",
+    links: []
   }
 ];
 
 const state = loadState();
+ensureDefaultCategories();
+ensureTodoNumbers();
 
 const todoForm = document.querySelector("#todoForm");
-const categoryForm = document.querySelector("#categoryForm");
-const linkForm = document.querySelector("#linkForm");
 const todoList = document.querySelector("#todoList");
 const archiveList = document.querySelector("#archiveList");
 const activeCount = document.querySelector("#activeCount");
 const archiveCount = document.querySelector("#archiveCount");
 const todoCategory = document.querySelector("#todoCategory");
-const linkCategory = document.querySelector("#linkCategory");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const emptyStateTemplate = document.querySelector("#emptyStateTemplate");
 
@@ -44,7 +66,6 @@ todoForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const formData = new FormData(todoForm);
   const title = formData.get("title").toString().trim();
-  const notes = formData.get("notes").toString().trim();
   const categoryId = formData.get("categoryId").toString();
 
   if (!title) {
@@ -53,8 +74,8 @@ todoForm.addEventListener("submit", (event) => {
 
   state.todos.push({
     id: createId(),
+    itemNumber: getNextTodoNumber(),
     title,
-    notes,
     categoryId,
     createdAt: new Date().toISOString()
   });
@@ -65,62 +86,15 @@ todoForm.addEventListener("submit", (event) => {
   render();
 });
 
-categoryForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const formData = new FormData(categoryForm);
-  const name = formData.get("name").toString().trim();
-  const color = formData.get("color").toString();
-
-  if (!name) {
-    return;
-  }
-
-  state.categories.push({
-    id: createId(),
-    name,
-    color,
-    links: []
-  });
-
-  persist();
-  categoryForm.reset();
-  document.querySelector("#categoryColor").value = "#1d8f6a";
-  render();
-});
-
-linkForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const formData = new FormData(linkForm);
-  const categoryId = formData.get("categoryId").toString();
-  const label = formData.get("label").toString().trim();
-  const url = formData.get("url").toString().trim();
-
-  const category = state.categories.find((entry) => entry.id === categoryId);
-  if (!category || !label || !url) {
-    return;
-  }
-
-  category.links.push({
-    id: createId(),
-    label,
-    url
-  });
-
-  persist();
-  linkForm.reset();
-  render();
-});
-
 exportCsvButton.addEventListener("click", () => {
   if (!state.archive.length) {
     window.alert("There are no completed items to export yet.");
     return;
   }
 
-  const header = ["Title", "Notes", "Category", "Created At", "Completed At"];
+  const header = ["Title", "Category", "Created At", "Completed At"];
   const rows = state.archive.map((item) => [
-    item.title,
-    item.notes || "",
+    formatTodoLabel(item),
     getCategoryName(item.categoryId),
     formatDateTime(item.createdAt),
     formatDateTime(item.completedAt)
@@ -141,24 +115,6 @@ exportCsvButton.addEventListener("click", () => {
   URL.revokeObjectURL(downloadUrl);
 });
 
-todoList.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-action]");
-  if (!button) {
-    return;
-  }
-
-  const todoId = button.dataset.todoId;
-  const action = button.dataset.action;
-
-  if (action === "complete") {
-    completeTodo(todoId);
-  }
-
-  if (action === "delete") {
-    deleteTodo(todoId);
-  }
-});
-
 todoList.addEventListener("change", (event) => {
   const checkbox = event.target.closest("input[data-action='complete']");
   if (!checkbox || !checkbox.checked) {
@@ -166,17 +122,6 @@ todoList.addEventListener("change", (event) => {
   }
 
   completeTodo(checkbox.dataset.todoId);
-});
-
-archiveList.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-action='remove-archive']");
-  if (!button) {
-    return;
-  }
-
-  state.archive = state.archive.filter((item) => item.id !== button.dataset.todoId);
-  persist();
-  render();
 });
 
 todoList.addEventListener("pointerdown", (event) => {
@@ -192,7 +137,8 @@ todoList.addEventListener("pointerdown", (event) => {
 
   dragState = {
     todoId: card.dataset.todoId,
-    pointerId: event.pointerId
+    pointerId: event.pointerId,
+    sourceCategoryId: card.dataset.categoryId
   };
   card.classList.add("dragging");
   document.body.style.userSelect = "none";
@@ -204,15 +150,19 @@ window.addEventListener("pointermove", (event) => {
   }
 
   const hoveredCard = document.elementFromPoint(event.clientX, event.clientY)?.closest(".todo-card");
+  const hoveredGroup = document.elementFromPoint(event.clientX, event.clientY)?.closest(".todo-group");
   document.querySelectorAll(".todo-card").forEach((card) => {
     card.classList.remove("drop-target");
   });
+  document.querySelectorAll(".todo-group").forEach((group) => {
+    group.classList.remove("group-drop-target");
+  });
 
-  if (!hoveredCard || hoveredCard.dataset.todoId === dragState.todoId) {
-    return;
+  if (hoveredCard && hoveredCard.dataset.todoId !== dragState.todoId) {
+    hoveredCard.classList.add("drop-target");
+  } else if (hoveredGroup && hoveredGroup.dataset.categoryId !== dragState.sourceCategoryId) {
+    hoveredGroup.classList.add("group-drop-target");
   }
-
-  hoveredCard.classList.add("drop-target");
 });
 
 window.addEventListener("pointerup", (event) => {
@@ -221,14 +171,21 @@ window.addEventListener("pointerup", (event) => {
   }
 
   const draggedId = dragState.todoId;
-  const targetCard = document.elementFromPoint(event.clientX, event.clientY)?.closest(".todo-card");
+  const dropPointElement = document.elementFromPoint(event.clientX, event.clientY);
+  const targetCard = dropPointElement?.closest(".todo-card");
+  const targetGroup = dropPointElement?.closest(".todo-group");
 
   document.querySelectorAll(".todo-card").forEach((card) => {
     card.classList.remove("dragging", "drop-target");
   });
+  document.querySelectorAll(".todo-group").forEach((group) => {
+    group.classList.remove("group-drop-target");
+  });
 
   if (targetCard && draggedId !== targetCard.dataset.todoId) {
-    reorderTodos(draggedId, targetCard.dataset.todoId);
+    moveTodoRelative(draggedId, targetCard.dataset.todoId, targetCard.dataset.categoryId);
+  } else if (targetGroup && targetGroup.dataset.categoryId) {
+    moveTodoToCategoryEnd(draggedId, targetGroup.dataset.categoryId);
   }
 
   dragState = null;
@@ -253,61 +210,76 @@ function renderTodoList() {
     return;
   }
 
+  const todosByCategory = new Map();
   state.todos.forEach((todo) => {
     const category = getCategory(todo.categoryId);
-    const card = document.createElement("article");
-    card.className = "todo-card";
-    card.dataset.todoId = todo.id;
+    if (!todosByCategory.has(category.id)) {
+      todosByCategory.set(category.id, {
+        category,
+        todos: []
+      });
+    }
+    todosByCategory.get(category.id).todos.push(todo);
+  });
 
-    const linksMarkup = category.links.map((link) => {
-      const anchor = document.createElement("a");
-      anchor.className = "category-link";
-      anchor.href = link.url;
-      anchor.target = "_blank";
-      anchor.rel = "noreferrer";
-      anchor.textContent = link.label;
-      applyCategoryColors(anchor, category.color, true);
-      return anchor;
-    });
+  state.categories.forEach((category) => {
+    const group = todosByCategory.get(category.id) || { category, todos: [] };
 
-    const linksWrap = document.createElement("div");
-    linksWrap.className = "category-links";
-    linksMarkup.forEach((anchor) => linksWrap.append(anchor));
+    const section = document.createElement("section");
+    section.className = "todo-group";
+    section.dataset.categoryId = category.id;
 
-    card.innerHTML = `
-      <div class="todo-topline">
-        <div class="todo-title-row">
-          <label class="todo-check">
-            <input type="checkbox" data-action="complete" data-todo-id="${todo.id}" aria-label="Complete ${escapeHtml(todo.title)}">
-            <span></span>
-          </label>
-          <div>
-            <div class="category-pill"></div>
-            <h3 class="todo-title"></h3>
-          </div>
-        </div>
-        <button class="drag-handle" type="button" aria-label="Drag to reorder">|||</button>
-      </div>
-      <p class="todo-notes"></p>
-      <div class="todo-actions">
-        <button class="tiny-button delete" type="button" data-action="delete" data-todo-id="${todo.id}">Delete</button>
-      </div>
-    `;
+    const heading = document.createElement("div");
+    heading.className = "todo-group-header";
 
-    const pill = card.querySelector(".category-pill");
-    pill.textContent = category.name;
-    applyCategoryColors(pill, category.color);
+    const title = document.createElement("h3");
+    title.className = "todo-group-title";
+    title.textContent = category.name;
+    applyCategoryColors(title, category.color);
 
-    card.querySelector(".todo-title").textContent = todo.title;
-    const notes = card.querySelector(".todo-notes");
-    notes.textContent = todo.notes || "No notes";
-    notes.hidden = !todo.notes;
+    const count = document.createElement("span");
+    count.className = "todo-group-count";
+    count.textContent = `${group.todos.length}`;
 
-    if (linksMarkup.length) {
-      card.append(linksWrap);
+    heading.append(title, count);
+    section.append(heading);
+
+    if (!group.todos.length) {
+      const emptyDrop = document.createElement("div");
+      emptyDrop.className = "todo-group-empty";
+      emptyDrop.textContent = "Drop a todo here";
+      section.append(emptyDrop);
+      todoList.append(section);
+      return;
     }
 
-    todoList.append(card);
+    group.todos.forEach((todo) => {
+      const card = document.createElement("article");
+      card.className = "todo-card";
+      card.dataset.todoId = todo.id;
+      card.dataset.categoryId = category.id;
+
+      card.innerHTML = `
+        <div class="todo-topline">
+          <div class="todo-title-row">
+            <label class="todo-check">
+              <input type="checkbox" data-action="complete" data-todo-id="${todo.id}" aria-label="Complete ${escapeHtml(todo.title)}">
+              <span></span>
+            </label>
+            <div>
+              <h3 class="todo-title"></h3>
+            </div>
+          </div>
+          <button class="drag-handle" type="button" aria-label="Drag to reorder">|||</button>
+        </div>
+      `;
+
+      card.querySelector(".todo-title").textContent = formatTodoLabel(todo);
+
+      section.append(card);
+    });
+
+    todoList.append(section);
   });
 }
 
@@ -336,12 +308,8 @@ function renderArchive() {
           <h3 class="archive-title"></h3>
         </div>
       </div>
-      <p class="archive-notes"></p>
       <div class="meta">
         <span>Completed: ${formatDateTime(item.completedAt)}</span>
-      </div>
-      <div class="archive-actions">
-        <button class="icon-button" type="button" data-action="remove-archive" data-todo-id="${item.id}">Remove</button>
       </div>
     `;
 
@@ -349,10 +317,7 @@ function renderArchive() {
     pill.textContent = category.name;
     applyCategoryColors(pill, category.color);
 
-    card.querySelector(".archive-title").textContent = item.title;
-    const notes = card.querySelector(".archive-notes");
-    notes.textContent = item.notes || "No notes";
-    notes.hidden = !item.notes;
+    card.querySelector(".archive-title").textContent = formatTodoLabel(item);
 
     archiveList.append(card);
   });
@@ -360,20 +325,16 @@ function renderArchive() {
 
 function populateCategorySelects() {
   const currentTodoValue = todoCategory.value;
-  const currentLinkValue = linkCategory.value;
 
-  [todoCategory, linkCategory].forEach((select) => {
-    select.innerHTML = "";
-    state.categories.forEach((category) => {
-      const option = document.createElement("option");
-      option.value = category.id;
-      option.textContent = category.name;
-      select.append(option);
-    });
+  todoCategory.innerHTML = "";
+  state.categories.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category.id;
+    option.textContent = category.name;
+    todoCategory.append(option);
   });
 
   todoCategory.value = currentTodoValue || state.categories[0]?.id || "";
-  linkCategory.value = currentLinkValue || state.categories[0]?.id || "";
 }
 
 function completeTodo(todoId) {
@@ -392,12 +353,6 @@ function completeTodo(todoId) {
   render();
 }
 
-function deleteTodo(todoId) {
-  state.todos = state.todos.filter((todo) => todo.id !== todoId);
-  persist();
-  render();
-}
-
 function reorderTodos(draggedId, targetId) {
   const draggedIndex = state.todos.findIndex((todo) => todo.id === draggedId);
   const targetIndex = state.todos.findIndex((todo) => todo.id === targetId);
@@ -412,6 +367,42 @@ function reorderTodos(draggedId, targetId) {
   render();
 }
 
+function moveTodoRelative(draggedId, targetId, categoryId) {
+  const draggedIndex = state.todos.findIndex((todo) => todo.id === draggedId);
+  const targetIndex = state.todos.findIndex((todo) => todo.id === targetId);
+
+  if (draggedIndex === -1 || targetIndex === -1) {
+    return;
+  }
+
+  const [draggedTodo] = state.todos.splice(draggedIndex, 1);
+  draggedTodo.categoryId = categoryId;
+  const adjustedTargetIndex = state.todos.findIndex((todo) => todo.id === targetId);
+  state.todos.splice(adjustedTargetIndex, 0, draggedTodo);
+  persist();
+  render();
+}
+
+function moveTodoToCategoryEnd(todoId, categoryId) {
+  const draggedIndex = state.todos.findIndex((todo) => todo.id === todoId);
+  if (draggedIndex === -1) {
+    return;
+  }
+
+  const [draggedTodo] = state.todos.splice(draggedIndex, 1);
+  draggedTodo.categoryId = categoryId;
+
+  const insertAfterIndex = findLastIndex(state.todos, (todo) => todo.categoryId === categoryId);
+  if (insertAfterIndex === -1) {
+    state.todos.push(draggedTodo);
+  } else {
+    state.todos.splice(insertAfterIndex + 1, 0, draggedTodo);
+  }
+
+  persist();
+  render();
+}
+
 function getCategory(categoryId) {
   return state.categories.find((category) => category.id === categoryId) || state.categories[0];
 }
@@ -422,9 +413,9 @@ function getCategoryName(categoryId) {
 
 function applyCategoryColors(element, color, solid = false) {
   const theme = color || "#1d8f6a";
-  element.style.background = solid ? theme : `${theme}22`;
+  element.style.background = solid ? theme : "transparent";
   element.style.color = solid ? "#ffffff" : theme;
-  element.style.border = solid ? "none" : `1px solid ${theme}55`;
+  element.style.border = "none";
 }
 
 function loadState() {
@@ -461,6 +452,59 @@ function persist() {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function ensureDefaultCategories() {
+  const existingNames = new Set(state.categories.map((category) => category.name.toUpperCase()));
+  let changed = false;
+
+  defaultCategories.forEach((category) => {
+    if (!existingNames.has(category.name.toUpperCase())) {
+      state.categories.push(cloneData(category));
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    persist();
+  }
+}
+
+function ensureTodoNumbers() {
+  let nextNumber = 10;
+  let changed = false;
+  const allItems = [...state.todos, ...state.archive];
+
+  allItems.forEach((item) => {
+    if (typeof item.itemNumber === "number") {
+      nextNumber = Math.max(nextNumber, item.itemNumber + 1);
+    }
+  });
+
+  allItems.forEach((item) => {
+    if (typeof item.itemNumber !== "number") {
+      item.itemNumber = nextNumber;
+      nextNumber += 1;
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    persist();
+  }
+}
+
+function getNextTodoNumber() {
+  return [...state.todos, ...state.archive].reduce((maxNumber, item) => {
+    if (typeof item.itemNumber === "number") {
+      return Math.max(maxNumber, item.itemNumber);
+    }
+    return maxNumber;
+  }, 9) + 1;
+}
+
+function formatTodoLabel(item) {
+  return `#${item.itemNumber} ${item.title}`;
+}
+
 function formatDateTime(value) {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -481,6 +525,15 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;");
 }
 
+function findLastIndex(items, predicate) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index], index)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
 function emptyState(message) {
   const fragment = emptyStateTemplate.content.firstElementChild.cloneNode(true);
   fragment.querySelector("p").textContent = message;
@@ -490,6 +543,9 @@ function emptyState(message) {
 function clearDragState() {
   document.querySelectorAll(".todo-card").forEach((card) => {
     card.classList.remove("dragging", "drop-target");
+  });
+  document.querySelectorAll(".todo-group").forEach((group) => {
+    group.classList.remove("group-drop-target");
   });
   dragState = null;
   document.body.style.userSelect = "";
