@@ -14,7 +14,6 @@
         <h1>Todo Board</h1>
         <p class="hero-copy">Create tasks, sort them with drag and drop, archive finished work with completion timestamps, and export your completed history.</p>
       </div>
-      <button class="ghost-button" id="exportCsvButton" type="button">Export Archive CSV</button>
     </header>
 
     <main class="layout">
@@ -89,6 +88,9 @@
           <span class="count-badge archive" id="archiveCount">0</span>
         </div>
         <div id="archiveList" class="archive-list"></div>
+        <div class="archive-footer">
+          <button class="ghost-button archive-export-button" id="exportCsvButton" type="button">Export Archive CSV</button>
+        </div>
       </section>
     </main>
   </div>

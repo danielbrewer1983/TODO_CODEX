@@ -108,6 +108,8 @@ button {
 
 .board-panel {
   min-height: 280px;
+  display: flex;
+  flex-direction: column;
 }
 
 .stack-form {
@@ -226,6 +228,15 @@ select:focus {
   gap: 12px;
 }
 
+.archive-footer {
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.archive-export-button {
+  width: 100%;
+}
+
 .todo-card,
 .archive-card {
   position: relative;
@@ -266,7 +277,7 @@ select:focus {
 .todo-title-row {
   display: flex;
   gap: 10px;
-  align-items: flex-start;
+  align-items: center;
   flex: 1;
 }
 
@@ -279,6 +290,45 @@ select:focus {
   background: rgba(29, 36, 51, 0.08);
   color: var(--text);
   font-size: 1.15rem;
+}
+
+.todo-check {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+}
+
+.todo-check input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+}
+
+.todo-check span {
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  border: 2px solid rgba(29, 143, 106, 0.55);
+  background: white;
+}
+
+.todo-check input:checked + span {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.todo-check input:checked + span::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 3px;
+  width: 7px;
+  height: 13px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
 }
 
 .todo-title,
@@ -326,11 +376,6 @@ select:focus {
   min-height: 38px;
   padding: 8px 12px;
   font-weight: 700;
-}
-
-.tiny-button.complete {
-  background: rgba(29, 143, 106, 0.16);
-  color: var(--primary-deep);
 }
 
 .tiny-button.delete,

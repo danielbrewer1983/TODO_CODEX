@@ -159,6 +159,15 @@ todoList.addEventListener("click", (event) => {
   }
 });
 
+todoList.addEventListener("change", (event) => {
+  const checkbox = event.target.closest("input[data-action='complete']");
+  if (!checkbox || !checkbox.checked) {
+    return;
+  }
+
+  completeTodo(checkbox.dataset.todoId);
+});
+
 archiveList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action='remove-archive']");
   if (!button) {
@@ -268,19 +277,19 @@ function renderTodoList() {
     card.innerHTML = `
       <div class="todo-topline">
         <div class="todo-title-row">
-          <button class="drag-handle" type="button" aria-label="Drag to reorder">|||</button>
+          <label class="todo-check">
+            <input type="checkbox" data-action="complete" data-todo-id="${todo.id}" aria-label="Complete ${escapeHtml(todo.title)}">
+            <span></span>
+          </label>
           <div>
             <div class="category-pill"></div>
             <h3 class="todo-title"></h3>
           </div>
         </div>
+        <button class="drag-handle" type="button" aria-label="Drag to reorder">|||</button>
       </div>
       <p class="todo-notes"></p>
-      <div class="meta">
-        <span>Added: ${formatDateTime(todo.createdAt)}</span>
-      </div>
       <div class="todo-actions">
-        <button class="tiny-button complete" type="button" data-action="complete" data-todo-id="${todo.id}">Complete</button>
         <button class="tiny-button delete" type="button" data-action="delete" data-todo-id="${todo.id}">Delete</button>
       </div>
     `;
@@ -329,7 +338,6 @@ function renderArchive() {
       </div>
       <p class="archive-notes"></p>
       <div class="meta">
-        <span>Added: ${formatDateTime(item.createdAt)}</span>
         <span>Completed: ${formatDateTime(item.completedAt)}</span>
       </div>
       <div class="archive-actions">
@@ -463,6 +471,14 @@ function formatDateTime(value) {
 function csvEscape(value) {
   const normalized = String(value ?? "");
   return `"${normalized.replaceAll('"', '""')}"`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
 function emptyState(message) {
